@@ -587,8 +587,8 @@
       <h2>Pay and hours</h2>
       <div class="pay-callout">
         <div class="pay-eyebrow">Starting rate</div>
-        <div class="pay-figure">USD 5 <span class="pay-sep">to</span> 10<span class="pay-unit">/ video</span></div>
-        <p class="pay-copy">Paid per finished video, including one round of feedback and the caption, based on experience. Your rate climbs as you prove yourself: more videos shipped, more consistency, more pay. You set your hours: 5 a week or 40, your call.</p>
+        <div class="pay-figure">USD 5 <span class="pay-sep">to</span> 10<span class="pay-unit">/ hr</span></div>
+        <p class="pay-copy">Based on experience. Your rate climbs as you prove yourself: more videos shipped, more consistency, more pay. You set your hours: 5 a week or 40, your call.</p>
       </div>
     </div>
   </section>
@@ -714,8 +714,11 @@
   </footer>
 
   <script>
-    // Applications go to the NLT jobs backend, which holds the Airtable key. No key lives in this page.
-    const JOBS_API = 'https://pcqghtwfedjokbzrcrlm.supabase.co/functions/v1/jobs';
+    // --- Airtable submission config ---
+    // Fill these in once the scoped personal access token is ready.
+    const AIRTABLE_TOKEN = 'patdtlxzgHya1JoIc.c1dbade977504dae066584ef1cde273a2962a5443ef9783f5c8b28fea014b3ca';
+    const AIRTABLE_BASE_ID = 'app9LXJtFUqO3VN0V';
+    const AIRTABLE_TABLE_ID = 'tblX7hn7jo8VoHfIp';
 
     const form = document.getElementById('applyForm');
     const submitBtn = document.getElementById('submitBtn');
@@ -744,28 +747,31 @@
         skills.push(otherSkillText);
       }
 
-      const payload = {
-        action: 'apply',
-        name: form.name.value.trim(),
-        email: form.email.value.trim(),
-        phone: form.phone.value.trim(),
-        languages: form.languages.value.trim(),
-        software: form.software.value.trim(),
-        experience: form.experience.value,
-        skills: skills,
-        portfolio: form.portfolio.value.trim(),
-        availability: form.availability.value,
-        anythingElse: form.anythingElse.value.trim()
+      const fields = {
+        'Name': form.name.value.trim(),
+        'Email': form.email.value.trim(),
+        'Phone': form.phone.value.trim(),
+        'Languages Spoken and Written': form.languages.value.trim(),
+        'Editing Software': form.software.value.trim(),
+        'Years of Editing Experience': form.experience.value,
+        'Additional Technical Skills': skills,
+        'Portfolio Link': form.portfolio.value.trim(),
+        'Availability (Hours per Week)': form.availability.value,
+        'Anything Else': form.anythingElse.value.trim(),
+        'Application Status': 'New'
       };
 
       try {
-        const res = await fetch(JOBS_API, {
+        const res = await fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_TABLE_ID}`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
+          headers: {
+            'Authorization': `Bearer ${AIRTABLE_TOKEN}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ fields, typecast: true })
         });
 
-        if (!res.ok) throw new Error('Application request failed');
+        if (!res.ok) throw new Error('Airtable request failed');
 
         form.style.display = 'none';
         document.querySelector('.apply-note').style.display = 'none';
