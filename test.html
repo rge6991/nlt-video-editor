@@ -539,8 +539,6 @@
     // Submissions go to the NLT jobs backend, which holds the Airtable key. No key lives in this page.
     const JOBS_API = 'https://pcqghtwfedjokbzrcrlm.supabase.co/functions/v1/jobs';
 
-    const CLOUDINARY_CLOUD_NAME = 'os1vbtid';
-    const CLOUDINARY_UPLOAD_PRESET = 'nlt_skills_test';
     const MAX_FILE_SIZE = 100 * 1024 * 1024;
 
     const uploadedFiles = {};
@@ -550,33 +548,48 @@
       if (fe) fe.classList.remove('visible');
     }
 
+    // The jobs backend signs each upload, only for skills-test links and with a limit, so nobody can
+    // put files into NLT's Cloudinary account without one. The signature also fixes the folder,
+    // the allowed video formats and the tags (task and applicant reference).
     function uploadToCloudinary(file, taskNum, onProgress) {
-      return new Promise(function (resolve, reject) {
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', 'https://api.cloudinary.com/v1_1/' + CLOUDINARY_CLOUD_NAME + '/video/upload');
-        xhr.upload.addEventListener('progress', function (e) {
-          if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+      return fetch(JOBS_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'upload-signature', recId: recId, task: taskNum })
+      }).then(function (res) {
+        return res.json().then(function (body) {
+          if (!res.ok) throw new Error(body.error || 'Upload failed.');
+          return body;
         });
-        xhr.onload = function () {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            try {
-              resolve(JSON.parse(xhr.responseText).secure_url);
-            } catch (err) {
-              reject(err);
+      }).then(function (sig) {
+        return new Promise(function (resolve, reject) {
+          const xhr = new XMLHttpRequest();
+          xhr.open('POST', 'https://api.cloudinary.com/v1_1/' + sig.cloudName + '/video/upload');
+          xhr.upload.addEventListener('progress', function (e) {
+            if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+          });
+          xhr.onload = function () {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              try {
+                resolve(JSON.parse(xhr.responseText).secure_url);
+              } catch (err) {
+                reject(err);
+              }
+            } else {
+              reject(new Error('Upload failed with status ' + xhr.status));
             }
-          } else {
-            reject(new Error('Upload failed with status ' + xhr.status));
-          }
-        };
-        xhr.onerror = function () { reject(new Error('Network error during upload')); };
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
-        // Tag every upload with who it's from, so it's traceable inside Cloudinary
-        // itself too, not just through the Airtable link.
-        formData.append('tags', 'nlt-skills-test,task-' + taskNum + (recId ? ',rec-' + recId : ''));
-        formData.append('context', 'applicant=' + (name || 'unknown') + '|task=' + taskNum + (recId ? '|rec_id=' + recId : ''));
-        xhr.send(formData);
+          };
+          xhr.onerror = function () { reject(new Error('Network error during upload')); };
+          const formData = new FormData();
+          formData.append('file', file);
+          formData.append('api_key', sig.apiKey);
+          formData.append('timestamp', sig.timestamp);
+          formData.append('folder', sig.folder);
+          formData.append('allowed_formats', sig.allowedFormats);
+          formData.append('tags', sig.tags);
+          formData.append('signature', sig.signature);
+          xhr.send(formData);
+        });
       });
     }
 
@@ -630,7 +643,7 @@
           progress.classList.remove('visible');
           inner.style.display = 'block';
           linkInput.disabled = false;
-          uploadError.textContent = 'Upload failed. Try again, or paste a link instead.';
+          uploadError.textContent = 'Upload failed. Try again with an MP4 or MOV file, or paste a link instead.';
           uploadError.classList.add('visible');
         });
       }
