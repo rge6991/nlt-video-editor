@@ -587,8 +587,8 @@
       <h2>Pay and hours</h2>
       <div class="pay-callout">
         <div class="pay-eyebrow">Starting rate</div>
-        <div class="pay-figure">USD 5 <span class="pay-sep">to</span> 10<span class="pay-unit">/ hr</span></div>
-        <p class="pay-copy">Based on experience. Your rate climbs as you prove yourself: more videos shipped, more consistency, more pay. You set your hours: 5 a week or 40, your call.</p>
+        <div class="pay-figure">USD 5 <span class="pay-sep">to</span> 8<span class="pay-unit">/ video</span></div>
+        <p class="pay-copy">Paid per approved video, including one round of feedback and the caption, based on experience. Your rate climbs as you prove yourself: more videos shipped, more consistency, more pay. You set your hours: 5 a week or 40, your call.</p>
       </div>
     </div>
   </section>
@@ -622,6 +622,11 @@
       <p class="apply-note">Step 1 starts here. Fill this in and we'll review it.</p>
 
       <form id="applyForm">
+        <!-- Honeypot: hidden from people, bots fill it in and get dropped by the backend. -->
+        <div aria-hidden="true" style="position:absolute;left:-10000px;top:auto;width:1px;height:1px;overflow:hidden">
+          <label for="website">Leave this empty</label>
+          <input type="text" id="website" name="website" tabindex="-1" autocomplete="off">
+        </div>
         <div class="field">
           <label for="name">Full name</label>
           <input type="text" id="name" name="name" required>
@@ -714,11 +719,8 @@
   </footer>
 
   <script>
-    // --- Airtable submission config ---
-    // Fill these in once the scoped personal access token is ready.
-    const AIRTABLE_TOKEN = 'patdtlxzgHya1JoIc.c1dbade977504dae066584ef1cde273a2962a5443ef9783f5c8b28fea014b3ca';
-    const AIRTABLE_BASE_ID = 'app9LXJtFUqO3VN0V';
-    const AIRTABLE_TABLE_ID = 'tblX7hn7jo8VoHfIp';
+    // Applications go to the NLT jobs backend, which holds the Airtable key. No key lives in this page.
+    const JOBS_API = 'https://pcqghtwfedjokbzrcrlm.supabase.co/functions/v1/jobs';
 
     const form = document.getElementById('applyForm');
     const submitBtn = document.getElementById('submitBtn');
@@ -747,31 +749,29 @@
         skills.push(otherSkillText);
       }
 
-      const fields = {
-        'Name': form.name.value.trim(),
-        'Email': form.email.value.trim(),
-        'Phone': form.phone.value.trim(),
-        'Languages Spoken and Written': form.languages.value.trim(),
-        'Editing Software': form.software.value.trim(),
-        'Years of Editing Experience': form.experience.value,
-        'Additional Technical Skills': skills,
-        'Portfolio Link': form.portfolio.value.trim(),
-        'Availability (Hours per Week)': form.availability.value,
-        'Anything Else': form.anythingElse.value.trim(),
-        'Application Status': 'New'
+      const payload = {
+        action: 'apply',
+        name: form.name.value.trim(),
+        email: form.email.value.trim(),
+        phone: form.phone.value.trim(),
+        languages: form.languages.value.trim(),
+        software: form.software.value.trim(),
+        experience: form.experience.value,
+        skills: skills,
+        portfolio: form.portfolio.value.trim(),
+        availability: form.availability.value,
+        anythingElse: form.anythingElse.value.trim(),
+        website: form.website.value
       };
 
       try {
-        const res = await fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_TABLE_ID}`, {
+        const res = await fetch(JOBS_API, {
           method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${AIRTABLE_TOKEN}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ fields, typecast: true })
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
         });
 
-        if (!res.ok) throw new Error('Airtable request failed');
+        if (!res.ok) throw new Error('Application request failed');
 
         form.style.display = 'none';
         document.querySelector('.apply-note').style.display = 'none';

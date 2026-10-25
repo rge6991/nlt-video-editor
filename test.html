@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="robots" content="noindex">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Skills Test — No Limits Tour</title>
 <style>
@@ -535,9 +536,8 @@
   </footer>
 
   <script>
-    const AIRTABLE_TOKEN = 'patdtlxzgHya1JoIc.c1dbade977504dae066584ef1cde273a2962a5443ef9783f5c8b28fea014b3ca';
-    const AIRTABLE_BASE_ID = 'app9LXJtFUqO3VN0V';
-    const AIRTABLE_TABLE_ID = 'tblt44Na8ow5NkYFf';
+    // Submissions go to the NLT jobs backend, which holds the Airtable key. No key lives in this page.
+    const JOBS_API = 'https://pcqghtwfedjokbzrcrlm.supabase.co/functions/v1/jobs';
 
     const CLOUDINARY_CLOUD_NAME = 'os1vbtid';
     const CLOUDINARY_UPLOAD_PRESET = 'nlt_skills_test';
@@ -699,34 +699,28 @@
       submitBtn.disabled = true;
       submitBtn.textContent = 'Submitting...';
 
-      const fields = {
-        'Applicant Name': name,
-        'Application': [recId],
-        'Task 1 Caption': form.t1caption.value.trim(),
-        'Task 1 Time to Produce': form.t1time.value.trim(),
-        'Task 2 Caption': form.t2caption.value.trim(),
-        'Task 2 Time to Produce': form.t2time.value.trim(),
-        'Task 3 Caption': form.t3caption.value.trim(),
-        'Task 3 Time to Produce': form.t3time.value.trim()
+      const payload = {
+        action: 'skills-test',
+        recId: recId,
+        name: name,
+        tasks: [1, 2, 3].map(function (n) {
+          return {
+            link: form['t' + n + 'link'].value.trim(),
+            fileUrl: uploadedFiles[n] || '',
+            caption: form['t' + n + 'caption'].value.trim(),
+            time: form['t' + n + 'time'].value.trim()
+          };
+        })
       };
 
-      [1, 2, 3].forEach(function (n) {
-        const linkVal = form['t' + n + 'link'].value.trim();
-        if (linkVal) fields['Task ' + n + ' Video Link'] = linkVal;
-        if (uploadedFiles[n]) fields['Task ' + n + ' Video File'] = [{ url: uploadedFiles[n] }];
-      });
-
       try {
-        const res = await fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_TABLE_ID}`, {
+        const res = await fetch(JOBS_API, {
           method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${AIRTABLE_TOKEN}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ fields, typecast: true })
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
         });
 
-        if (!res.ok) throw new Error('Airtable request failed');
+        if (!res.ok) throw new Error('Skills test request failed');
 
         form.style.display = 'none';
         document.querySelector('.apply-note').style.display = 'none';
